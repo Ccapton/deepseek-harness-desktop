@@ -45,10 +45,11 @@ function makeOptions(overrides: Partial<LinuxDesktopInstallOptions> = {}): {
       icon: 'dsh-desktop',
       terminal: false,
       categories: 'Development;',
-      startupWmClass: 'DSH Desktop',
+      startupWmClass: 'dsh-plugin-desktop',
       keywords: 'deepseek;harness;dsh;ai;',
     },
     iconName: 'dsh-desktop',
+    desktopName: 'dsh-plugin-desktop',
     iconSizes: [128, 256, 512],
     exists: () => true,
     isExecutable: () => true,
@@ -73,7 +74,7 @@ describe('desktop entry content', () => {
       icon: 'dsh-desktop',
       terminal: false,
       categories: 'Development;',
-      startupWmClass: 'DSH Desktop',
+      startupWmClass: 'dsh-plugin-desktop',
       keywords: 'deepseek;harness;dsh;ai;',
     })
 
@@ -87,7 +88,7 @@ describe('desktop entry content', () => {
       'Icon=dsh-desktop',
       'Terminal=false',
       'Categories=Development;',
-      'StartupWMClass=DSH Desktop',
+      'StartupWMClass=dsh-plugin-desktop',
       'Keywords=deepseek;harness;dsh;ai;',
       '',
     ].join('\n'))
@@ -109,7 +110,7 @@ describe('Linux desktop installation', () => {
       },
     ])
     expect(writes.writtenText).toEqual([{
-      path: '/home/user/.local/share/applications/dsh-desktop.desktop',
+      path: '/home/user/.local/share/applications/dsh-plugin-desktop.desktop',
       content: desktopEntryContent({
         name: 'DSH Desktop',
         genericName: 'DeepSeek Harness Desktop',
@@ -118,7 +119,7 @@ describe('Linux desktop installation', () => {
         icon: 'dsh-desktop',
         terminal: false,
         categories: 'Development;',
-        startupWmClass: 'DSH Desktop',
+        startupWmClass: 'dsh-plugin-desktop',
         keywords: 'deepseek;harness;dsh;ai;',
       }),
     }])
@@ -133,7 +134,7 @@ describe('Linux desktop installation', () => {
     ])
     expect(writes.logs).toEqual([
       'Installed AppImage to /home/user/Applications/DSH Desktop-2.0.0.AppImage',
-      'Wrote desktop entry to /home/user/.local/share/applications/dsh-desktop.desktop',
+      'Wrote desktop entry to /home/user/.local/share/applications/dsh-plugin-desktop.desktop',
       'Installed icons to /home/user/.local/share/icons/hicolor',
     ])
   })

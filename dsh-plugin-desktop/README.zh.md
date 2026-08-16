@@ -179,7 +179,7 @@ corepack yarn dist:linux
 corepack yarn install:linux-desktop
 ```
 
-`install:linux-desktop` 会把 AppImage 复制到 `~/Applications`，写入 `~/.local/share/applications/dsh-desktop.desktop`，并把缩放后的应用图标安装到 `~/.local/share/icons/hicolor/`。有 ImageMagick 时会用它缩放，否则回退为直接复制源图。启动器条目设置 `StartupWMClass=DSH Desktop`，使运行中的窗口归并到同一图标下。该本地命令构建的是用于测试的未签名 AppImage；发布签名、AppImage 更新通道发布与升级测试仍是独立的发布 gate。
+`install:linux-desktop` 会把 AppImage 复制到 `~/Applications`，写入 `~/.local/share/applications/dsh-plugin-desktop.desktop`，并把缩放后的应用图标安装到 `~/.local/share/icons/hicolor/`。有 ImageMagick 时会用它缩放，否则回退为直接复制源图。应用在 `package.json` 中声明 `desktopName=dsh-plugin-desktop`，且启动器条目设置 `StartupWMClass=dsh-plugin-desktop`，使运行中的窗口归并到同一图标下。该本地命令构建的是用于测试的未签名 AppImage；发布签名、AppImage 更新通道发布与升级测试仍是独立的发布 gate。
 
 ## 模型体验
 

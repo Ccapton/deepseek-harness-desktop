@@ -74,6 +74,8 @@ export interface LinuxDesktopInstallOptions {
   readonly entry: DesktopEntry
   /** Icon name installed into the hicolor theme. */
   readonly iconName: string
+  /** Base filename of the launcher entry and the Electron desktop name. */
+  readonly desktopName: string
   /** Square icon sizes to install. */
   readonly iconSizes: readonly number[]
   /** Report whether a file exists. */
@@ -164,10 +166,11 @@ function defaultOptions(): LinuxDesktopInstallOptions {
       icon: 'dsh-desktop',
       terminal: false,
       categories: 'Development;',
-      startupWmClass: 'DSH Desktop',
+      startupWmClass: 'dsh-plugin-desktop',
       keywords: 'deepseek;harness;dsh;ai;',
     },
     iconName: 'dsh-desktop',
+    desktopName: 'dsh-plugin-desktop',
     iconSizes: [128, 256, 512],
     exists,
     isExecutable,
@@ -209,7 +212,7 @@ export function installLinuxDesktop(
   }
   options.log(`Installed AppImage to ${installedAppImage}`)
 
-  const desktopPath = join(options.appsDir, `${options.iconName}.desktop`)
+  const desktopPath = join(options.appsDir, `${options.desktopName}.desktop`)
   options.mkdir(options.appsDir)
   options.writeText(
     desktopPath,

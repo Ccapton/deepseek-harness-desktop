@@ -179,7 +179,7 @@ To install the AppImage as a desktop application, run:
 corepack yarn install:linux-desktop
 ```
 
-`install:linux-desktop` copies the AppImage into `~/Applications`, writes `~/.local/share/applications/dsh-desktop.desktop`, and installs resized application icons under `~/.local/share/icons/hicolor/`. It uses ImageMagick when available and falls back to copying the source artwork otherwise. The launcher entry sets `StartupWMClass=DSH Desktop` so the running window groups under the same icon. This local command produces an unsigned AppImage for testing; release signing, AppImage update-channel publishing, and upgrade testing remain separate release gates.
+`install:linux-desktop` copies the AppImage into `~/Applications`, writes `~/.local/share/applications/dsh-plugin-desktop.desktop`, and installs resized application icons under `~/.local/share/icons/hicolor/`. It uses ImageMagick when available and falls back to copying the source artwork otherwise. The app declares `desktopName=dsh-plugin-desktop` in `package.json` and the launcher entry sets `StartupWMClass=dsh-plugin-desktop`, so the running window groups under the same icon. This local command produces an unsigned AppImage for testing; release signing, AppImage update-channel publishing, and upgrade testing remain separate release gates.
 
 ## Model Experience
 

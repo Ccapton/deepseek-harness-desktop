@@ -10,6 +10,7 @@
   },
   "type": "module",
   "main": "lib/main.js",
+  "desktopName": "dsh-plugin-desktop.desktop",
   "types": "lib/types/index.d.ts",
   "bin": {
     "dsh-desktop": "lib/bin.js",
@@ -288,7 +289,8 @@
       "target": [
         "dir"
       ],
-      "icon": "build/app-icon.png"
+      "icon": "build/app-icon.png",
+      "syncDesktopName": true
     }
   }
 }
