@@ -161,6 +161,26 @@ Python and Visual Studio C++ Build Tools are not required. The Windows command u
 
 This local command deliberately strips Windows certificate variables and sets `signExecutable=false`. Its output is installable for testing but has no Authenticode publisher, so Windows can display an Unknown publisher or SmartScreen warning. A signed Windows release, certificate verification, installer upgrade/uninstall testing, and native UI/sandbox smoke remain separate release gates.
 
+### Local Linux x64 AppImage
+
+Use a native Linux machine with Git and Node `22.19+` or `24+`. From a fresh `v2` checkout, run:
+
+```sh
+git submodule update --init --recursive
+corepack yarn install --immutable
+corepack yarn dist:linux
+```
+
+`dist:linux` refuses non-Linux hosts and non-`x64`/`arm64` Node, runs a Linux gate containing the build, all TypeScript compiler faces, and the Linux packaging and desktop-integration tests, then builds an unsigned AppImage. Version `2.0.0` is written to `dsh-plugin-desktop/dist/DSH Desktop-2.0.0.AppImage`.
+
+To install the AppImage as a desktop application, run:
+
+```sh
+corepack yarn install:linux-desktop
+```
+
+`install:linux-desktop` copies the AppImage into `~/Applications`, writes `~/.local/share/applications/dsh-desktop.desktop`, and installs resized application icons under `~/.local/share/icons/hicolor/`. It uses ImageMagick when available and falls back to copying the source artwork otherwise. The launcher entry sets `StartupWMClass=DSH Desktop` so the running window groups under the same icon. This local command produces an unsigned AppImage for testing; release signing, AppImage update-channel publishing, and upgrade testing remain separate release gates.
+
 ## Model Experience
 
 None. The desktop package changes application composition and native presentation; it does not add model-visible instructions, tools, events, or request fields.

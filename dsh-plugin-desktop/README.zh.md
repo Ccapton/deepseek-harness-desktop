@@ -161,6 +161,26 @@ corepack.cmd yarn dist:win
 
 该本地命令会主动移除 Windows 证书变量，并设置 `signExecutable=false`。产物可以安装测试，但没有 Authenticode publisher，因此 Windows 可能显示 Unknown publisher 或 SmartScreen 警告。签名后的 Windows release、证书校验、安装器升级与卸载测试，以及原生 UI 和 sandbox smoke 仍是独立的发布 gate。
 
+### Linux x64 AppImage
+
+请使用原生 Linux 电脑，并安装 Git 与 Node `22.19+` 或 `24+`。在一个最新的 `v2` checkout 中执行：
+
+```sh
+git submodule update --init --recursive
+corepack yarn install --immutable
+corepack yarn dist:linux
+```
+
+`dist:linux` 会拒绝非 Linux 宿主以及非 `x64`/`arm64` 的 Node，先执行包含 build、全部 TypeScript compiler face，以及 Linux 打包与桌面集成聚焦测试的 gate，然后构建未签名的 AppImage。版本 `2.0.0` 会输出到 `dsh-plugin-desktop/dist/DSH Desktop-2.0.0.AppImage`。
+
+要把 AppImage 安装为桌面应用，执行：
+
+```sh
+corepack yarn install:linux-desktop
+```
+
+`install:linux-desktop` 会把 AppImage 复制到 `~/Applications`，写入 `~/.local/share/applications/dsh-desktop.desktop`，并把缩放后的应用图标安装到 `~/.local/share/icons/hicolor/`。有 ImageMagick 时会用它缩放，否则回退为直接复制源图。启动器条目设置 `StartupWMClass=DSH Desktop`，使运行中的窗口归并到同一图标下。该本地命令构建的是用于测试的未签名 AppImage；发布签名、AppImage 更新通道发布与升级测试仍是独立的发布 gate。
+
 ## 模型体验
 
 无。desktop package 只改变应用组合与原生呈现，不增加任何模型可见的指令、工具、事件或请求字段。
