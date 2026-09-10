@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
+  packageWindowsArtifact,
   packageWindowsInstaller,
   type WindowsPackageOptions,
 } from '../scripts/package-win.ts'
@@ -28,6 +29,7 @@ function options(calls: CommandCall[], logs: string[] = []): WindowsPackageOptio
     desktopRoot: 'C:\\repo\\dsh-plugin-desktop',
     commandShell: 'C:\\Windows\\System32\\cmd.exe',
     builderCli: 'C:\\repo\\node_modules\\electron-builder\\cli.js',
+    prepareRuntime: () => undefined,
     verifier: 'C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-installer.ts',
     nodeExecutable: 'C:\\Program Files\\nodejs\\node.exe',
     run: (command, args, cwd, env) => {
@@ -41,9 +43,11 @@ describe('Windows x64 installer packaging', () => {
   it('checks without credentials, builds an unsigned NSIS target, then verifies it', () => {
     const calls: CommandCall[] = []
     const logs: string[] = []
+    const prepareRuntime = vi.fn()
 
-    packageWindowsInstaller(options(calls, logs))
+    packageWindowsInstaller({ ...options(calls, logs), prepareRuntime })
 
+    expect(prepareRuntime).toHaveBeenCalledOnce()
     expect(calls).toHaveLength(3)
     expect(calls[0]).toEqual({
       command: 'C:\\Windows\\System32\\cmd.exe',
@@ -73,6 +77,7 @@ describe('Windows x64 installer packaging', () => {
         PATH: 'C:\\Windows\\System32',
         SAFE_VALUE: 'kept',
         CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+        DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
       },
     })
     expect(calls[2]).toEqual({
@@ -83,6 +88,64 @@ describe('Windows x64 installer packaging', () => {
     })
     expect(logs).toEqual([
       'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
+    ])
+  })
+
+  it('checks without credentials, builds an unsigned portable ZIP target, then verifies it', () => {
+    const calls: CommandCall[] = []
+    const logs: string[] = []
+    const value = {
+      ...options(calls, logs),
+      verifier: 'C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts',
+    }
+
+    packageWindowsArtifact(value, 'zip', 'portable archive')
+
+    expect(calls[1]?.args).toEqual([
+      'C:\\repo\\node_modules\\electron-builder\\cli.js',
+      '--win',
+      'zip',
+      '--x64',
+      '--publish',
+      'never',
+      '--config.win.signExecutable=false',
+      '--config.npmRebuild=false',
+    ])
+    expect(calls[2]?.args).toEqual([
+      'C:\\repo\\dsh-plugin-desktop\\scripts\\verify-win-portable.ts',
+    ])
+    expect(logs).toEqual([
+      'Building an unsigned Windows x64 portable archive; Authenticode is a separate release step.',
+    ])
+  })
+
+  it('reuses a completed CI package gate when explicitly requested', () => {
+    const calls: CommandCall[] = []
+    const logs: string[] = []
+    const value = {
+      ...options(calls, logs),
+      env: {
+        ...options(calls).env,
+        DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+      },
+    }
+
+    packageWindowsInstaller(value)
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0]?.args).toEqual([
+      'C:\\repo\\node_modules\\electron-builder\\cli.js',
+      '--win',
+      'nsis',
+      '--x64',
+      '--publish',
+      'never',
+      '--config.win.signExecutable=false',
+      '--config.npmRebuild=false',
+    ])
+    expect(logs).toEqual([
+      'Building an unsigned Windows x64 installer; Authenticode is a separate release step.',
+      'Skipping the Windows package preflight; the package gate already passed.',
     ])
   })
 

@@ -1,9 +1,11 @@
-/** Build an unsigned Windows x64 NSIS installer on a native Windows host. */
+/** Build an unsigned Windows x64 artifact on a native Windows host. */
 
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
+import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 
 const WINDOWS_SIGNING_KEYS = [
   'CSC_IDENTITY_AUTO_DISCOVERY',
@@ -32,6 +34,8 @@ export interface WindowsPackageOptions {
   readonly commandShell: string
   /** Absolute electron-builder CLI module. */
   readonly builderCli: string
+  /** Prepare platform-specific native runtime dependencies before packaging. */
+  readonly prepareRuntime: () => void
   /** Absolute packaged-installer verification script. */
   readonly verifier: string
   /** Node executable used to run package-local scripts. */
@@ -76,7 +80,8 @@ function run(
   }
 }
 
-function defaultOptions(): WindowsPackageOptions {
+/** Create the native packaging options for a verifier entry point. */
+export function createWindowsPackageOptions(verifier = './verify-win-installer.ts'): WindowsPackageOptions {
   const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
   const workspaceRoot = resolve(desktopRoot, '..')
   const require = createRequire(import.meta.url)
@@ -92,54 +97,66 @@ function defaultOptions(): WindowsPackageOptions {
       ? 'cmd.exe'
       : join(windowsRoot, 'System32', 'cmd.exe'),
     builderCli: require.resolve('electron-builder/cli.js'),
-    verifier: fileURLToPath(new URL('./verify-win-installer.ts', import.meta.url)),
+    prepareRuntime: () => {
+      prepareFsExtForElectron({ platform: 'win32', arch: 'x64', desktopRoot })
+    },
+    verifier: fileURLToPath(new URL(verifier, import.meta.url)),
     nodeExecutable: process.execPath,
     run,
     log: message => console.log(message),
   }
 }
 
-/**
- * Run the headless release gates and package one unsigned x64 NSIS installer.
- * @param options - Injectable process and command boundaries.
- */
-export function packageWindowsInstaller(
-  options: WindowsPackageOptions = defaultOptions(),
-): void {
+/** Run the shared host and Node release gates before packaging. */
+function assertWindowsPackageHost(options: WindowsPackageOptions, artifact: string): void {
   if (options.platform !== 'win32') {
-    throw new Error('Windows installer must be built on a native Windows host')
+    throw new Error(`Windows ${artifact} must be built on a native Windows host`)
   }
   if (options.arch !== 'x64') {
-    throw new Error(`Windows installer requires x64 Node; received ${options.arch}`)
+    throw new Error(`Windows ${artifact} requires x64 Node; received ${options.arch}`)
   }
   const versionMatch = /^(\d+)\.(\d+)\./u.exec(options.nodeVersion)
   const major = Number(versionMatch?.[1])
   const minor = Number(versionMatch?.[2])
   if (!((major === 22 && minor >= 19) || major === 24)) {
     throw new Error(
-      `Windows installer requires Node 22.19+ or Node 24.x with bundled Corepack; received ${options.nodeVersion}`,
+      `Windows ${artifact} requires Node 22.19+ or Node 24.x with bundled Corepack; received ${options.nodeVersion}`,
     )
   }
+}
+
+/** Run the gates and package one unsigned x64 Windows artifact. */
+export function packageWindowsArtifact(
+  options: WindowsPackageOptions,
+  target: 'nsis' | 'zip',
+  artifact: 'installer' | 'portable archive',
+): void {
+  assertWindowsPackageHost(options, artifact)
 
   const cleanEnvironment = withoutWindowsSigningSecrets(options.env)
-  options.log('Building an unsigned Windows x64 installer; Authenticode is a separate release step.')
-  options.run(
-    options.commandShell,
-    [
-      '/d',
-      '/s',
-      '/c',
-      'corepack yarn workspace dsh-plugin-desktop check:win-package',
-    ],
-    options.workspaceRoot,
-    cleanEnvironment,
-  )
+  options.log(`Building an unsigned Windows x64 ${artifact}; Authenticode is a separate release step.`)
+  if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
+    options.run(
+      options.commandShell,
+      [
+        '/d',
+        '/s',
+        '/c',
+        'corepack yarn workspace dsh-plugin-desktop check:win-package',
+      ],
+      options.workspaceRoot,
+      cleanEnvironment,
+    )
+  } else {
+    options.log('Skipping the Windows package preflight; the package gate already passed.')
+  }
+  options.prepareRuntime()
   options.run(
     options.nodeExecutable,
     [
       options.builderCli,
       '--win',
-      'nsis',
+      target,
       '--x64',
       '--publish',
       'never',
@@ -147,10 +164,10 @@ export function packageWindowsInstaller(
       '--config.npmRebuild=false',
     ],
     options.desktopRoot,
-    {
+    electronBuilderEnvironment({
       ...cleanEnvironment,
       CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-    },
+    }),
   )
   options.run(
     options.nodeExecutable,
@@ -158,6 +175,13 @@ export function packageWindowsInstaller(
     options.desktopRoot,
     cleanEnvironment,
   )
+}
+
+/** Run the headless release gates and package one unsigned x64 NSIS installer. */
+export function packageWindowsInstaller(
+  options: WindowsPackageOptions = createWindowsPackageOptions(),
+): void {
+  packageWindowsArtifact(options, 'nsis', 'installer')
 }
 
 const invokedPath = process.argv[1]
