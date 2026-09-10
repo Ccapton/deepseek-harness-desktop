@@ -11,7 +11,11 @@ interface CommandCall {
   readonly env: NodeJS.ProcessEnv
 }
 
-function options(calls: CommandCall[], logs: string[] = []): LinuxPackageOptions {
+function options(
+  calls: CommandCall[],
+  logs: string[] = [],
+  events: string[] = [],
+): LinuxPackageOptions {
   return {
     env: { PATH: '/usr/bin' },
     platform: 'linux',
@@ -21,11 +25,15 @@ function options(calls: CommandCall[], logs: string[] = []): LinuxPackageOptions
     desktopRoot: '/repo/dsh-plugin-desktop',
     commandShell: '/bin/sh',
     builderCli: '/repo/node_modules/electron-builder/cli.js',
+    prepareNative: arch => {
+      events.push(`prepare:${arch}`)
+    },
     nodeExecutable: '/usr/bin/node',
     expectedArtifact: '/repo/dsh-plugin-desktop/dist/DSH Desktop-2.0.0.AppImage',
     exists: () => true,
     isExecutable: () => true,
     run: (command, args, cwd, env) => {
+      events.push(`run:${command}`)
       calls.push({ command, args: [...args], cwd, env: { ...env } })
     },
     log: message => logs.push(message),
@@ -33,12 +41,14 @@ function options(calls: CommandCall[], logs: string[] = []): LinuxPackageOptions
 }
 
 describe('Linux AppImage packaging', () => {
-  it('checks the desktop package, builds an unsigned AppImage, then verifies it', () => {
+  it('checks the desktop package, prepares the native binding, builds an unsigned AppImage, then verifies it', () => {
     const calls: CommandCall[] = []
     const logs: string[] = []
+    const events: string[] = []
 
-    packageLinuxAppImage(options(calls, logs))
+    packageLinuxAppImage(options(calls, logs, events))
 
+    expect(events).toEqual(['run:/bin/sh', 'prepare:x64', 'run:/usr/bin/node'])
     expect(calls).toHaveLength(2)
     expect(calls[0]).toEqual({
       command: '/bin/sh',
@@ -58,7 +68,11 @@ describe('Linux AppImage packaging', () => {
         '--config.npmRebuild=false',
       ],
       cwd: '/repo/dsh-plugin-desktop',
-      env: { PATH: '/usr/bin', CSC_IDENTITY_AUTO_DISCOVERY: 'false' },
+      env: {
+        PATH: '/usr/bin',
+        CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+        DSH_ELECTRON_BUILDER_TRAVERSAL_ONLY: '1',
+      },
     })
     expect(logs).toEqual([
       'Building an unsigned Linux x64 AppImage.',
@@ -66,10 +80,12 @@ describe('Linux AppImage packaging', () => {
     ])
   })
 
-  it('uses --arm64 for an arm64 host', () => {
+  it('uses --arm64 and prepares the arm64 binding for an arm64 host', () => {
     const calls: CommandCall[] = []
-    packageLinuxAppImage({ ...options(calls), arch: 'arm64' })
+    const events: string[] = []
+    packageLinuxAppImage({ ...options(calls, [], events), arch: 'arm64' })
     expect(calls[1]?.args).toContain('--arm64')
+    expect(events).toEqual(['run:/bin/sh', 'prepare:arm64', 'run:/usr/bin/node'])
   })
 
   it.each([
@@ -80,9 +96,11 @@ describe('Linux AppImage packaging', () => {
     'rejects unsupported host %s/%s with Node %s before running commands',
     (platform, arch, nodeVersion, message) => {
       const calls: CommandCall[] = []
-      const value = { ...options(calls), platform, arch, nodeVersion }
+      const events: string[] = []
+      const value = { ...options(calls, [], events), platform, arch, nodeVersion }
 
       expect(() => packageLinuxAppImage(value)).toThrow(message)
+      expect(events).toEqual([])
       expect(calls).toEqual([])
     },
   )

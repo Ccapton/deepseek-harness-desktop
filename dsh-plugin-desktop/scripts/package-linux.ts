@@ -5,6 +5,8 @@ import { accessSync, constants, existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
+import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 
 /** Injectable native Linux packaging boundary used by focused tests. */
 export interface LinuxPackageOptions {
@@ -24,6 +26,8 @@ export interface LinuxPackageOptions {
   readonly commandShell: string
   /** Absolute electron-builder CLI module. */
   readonly builderCli: string
+  /** Build the Electron-ABI native binding the packaged runtime loads on Linux. */
+  readonly prepareNative: (arch: 'arm64' | 'x64') => void
   /** Node executable used to run package-local scripts. */
   readonly nodeExecutable: string
   /** AppImage artifact electron-builder is expected to write. */
@@ -83,6 +87,9 @@ function defaultOptions(): LinuxPackageOptions {
     desktopRoot,
     commandShell: '/bin/sh',
     builderCli: require.resolve('electron-builder/cli.js'),
+    prepareNative: arch => {
+      prepareFsExtForElectron({ platform: 'linux', arch, desktopRoot })
+    },
     nodeExecutable: process.execPath,
     expectedArtifact: join(desktopRoot, 'dist', `DSH Desktop-${manifest.version}.AppImage`),
     exists,
@@ -94,6 +101,10 @@ function defaultOptions(): LinuxPackageOptions {
 
 /**
  * Build one unsigned Linux AppImage for the current host architecture.
+ *
+ * Linux shares the packaged-runtime contract macOS has: the session backend
+ * loads the Electron-ABI `fs-ext` binding, so the ABI-qualified prebuild must
+ * exist before Electron Builder copies the runtime closure into the AppImage.
  * @param options - Injectable process and command boundaries.
  */
 export function packageLinuxAppImage(
@@ -114,14 +125,16 @@ export function packageLinuxAppImage(
     )
   }
 
-  const archFlag = options.arch === 'arm64' ? '--arm64' : '--x64'
-  options.log(`Building an unsigned Linux ${options.arch} AppImage.`)
+  const targetArch = options.arch === 'arm64' ? 'arm64' : 'x64'
+  const archFlag = `--${targetArch}`
+  options.log(`Building an unsigned Linux ${targetArch} AppImage.`)
   options.run(
     options.commandShell,
     ['-c', 'corepack yarn workspace dsh-plugin-desktop check:linux-package'],
     options.workspaceRoot,
     options.env,
   )
+  options.prepareNative(targetArch)
   options.run(
     options.nodeExecutable,
     [
@@ -134,7 +147,10 @@ export function packageLinuxAppImage(
       '--config.npmRebuild=false',
     ],
     options.desktopRoot,
-    { ...options.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' },
+    electronBuilderEnvironment({
+      ...options.env,
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false',
+    }),
   )
   if (!options.exists(options.expectedArtifact)) {
     throw new Error(`electron-builder did not produce ${options.expectedArtifact}`)
